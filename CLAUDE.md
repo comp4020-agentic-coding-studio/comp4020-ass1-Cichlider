@@ -160,3 +160,35 @@ catching you out, a fact about the stack the agent keeps getting wrong --- write
 it down here. Growing this file is the work of harness engineering, and the gap
 between this boilerplate and your own version is part of what your prototype
 says about the developer you're becoming.
+
+## This week: three.js exploded-view rules
+
+This prototype is a three.js scene (an exploded-view desktop computer), which
+the checks above can't see into --- `pnpm check` never renders a frame. These
+rules came from bugs the checks couldn't catch, only manual verification could:
+
+- **Never trust a screenshot's pixel coordinates for a click test.** Eyeballing
+  where a part "looks like" it landed after an explode animation is how a click
+  aimed at RAM landed on CPU instead. Compute the click target from the same
+  camera/projection math the scene actually uses (eye position, fov, aspect,
+  each part's world position) and click *that* coordinate. If you don't have
+  the exact math to hand, a dense grid of clicks across the canvas (recording
+  which part responds at each point) is the fallback --- but it only tells you
+  what's clickable, not why something isn't.
+- **A raycaster hit-tests geometry, not what's visually opaque.** A
+  `transparent: true, opacity: 0.16` mesh (the see-through case shell) still
+  wins `intersectObjects()` over a solid part sitting behind it along the same
+  ray, so the case silently ate clicks meant for parts inside it. Get *all*
+  intersections and skip transparent-marked hits when a solid one also exists,
+  rather than taking `intersectObjects()[0]`.
+- **An explode direction's magnitude matters as much as its angle.** A
+  non-unit `explodeDir` (e.g. `(0, 2, 0)`) combined with a generous
+  `EXPLODE_DISTANCE` sent the case flying off-screen entirely once exploded ---
+  it was technically still "exploded correctly", just no longer visible or
+  clickable. Keep every part's direction a unit vector and let one shared
+  distance constant control how far things move.
+- **Radial spacing between explode directions isn't enough on its own if the
+  parts have very different footprints.** Two parts 60° apart is fine when
+  both are small, but a large flat part (the motherboard) can still occlude a
+  smaller neighbour in the two slots adjacent to it. Put the smallest parts in
+  the slots next to the largest one, not just anywhere in the fan.
