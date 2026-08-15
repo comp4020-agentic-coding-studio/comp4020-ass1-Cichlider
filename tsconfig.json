@@ -10,8 +10,9 @@
     "skipLibCheck": true,
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
     "useDefineForClassFields": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["*.ts", "spec"]
+  "include": ["*.ts", "src", "spec"]
 }
