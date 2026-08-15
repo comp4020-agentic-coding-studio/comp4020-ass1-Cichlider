@@ -1,174 +1,186 @@
+import gsap from "gsap";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { flyCamera } from "./src/camera-rig.ts";
+import { CAMERA, AUTO_ROTATE_SPEED, DURATION, EXPLODE_DISTANCE, REDUCED_MOTION } from "./src/config.ts";
+import { setupInteraction } from "./src/interaction.ts";
+import { buildPart, setPartDimmed } from "./src/model.ts";
+import { PARTS, type PartDef } from "./src/parts-data.ts";
+import { createScene } from "./src/scene.ts";
+import { SceneStateMachine } from "./src/state.ts";
+import { setupUI } from "./src/ui.ts";
 
-interface Part {
-  name: string;
-  info: string;
-  color: number;
-  size: [number, number, number];
-  assembled: THREE.Vector3;
-  explodeDir: THREE.Vector3;
-  transparent?: boolean;
+const container = document.querySelector<HTMLDivElement>('[data-testid="scene"]');
+if (!container) throw new Error('missing [data-testid="scene"]');
+
+const { scene, camera, renderer, controls, resize } = createScene(container);
+const ui = setupUI();
+const sm = new SceneStateMachine();
+
+const computer = new THREE.Group();
+const groupsById = new Map<string, THREE.Group>();
+for (const part of PARTS) {
+  const group = buildPart(part);
+  groupsById.set(part.id, group);
+  computer.add(group);
+}
+scene.add(computer);
+
+const maxOrder = Math.max(...PARTS.map((p) => p.order));
+let hoveredGroup: THREE.Group | null = null;
+let currentPartId: string | null = null;
+
+function refreshDimState() {
+  const highlightId = hoveredGroup ? (hoveredGroup.userData.part as PartDef).id : currentPartId;
+  for (const [id, group] of groupsById) {
+    setPartDimmed(group, highlightId !== null && id !== highlightId);
+  }
 }
 
-const PARTS: Part[] = [
-  {
-    name: "Case",
-    info: "The shell that holds every part in alignment and channels airflow — remove it and nothing stays cool or in place.",
-    color: 0x4b5563,
-    size: [4.4, 5.2, 3.6],
-    assembled: new THREE.Vector3(0, 0, 0),
-    explodeDir: new THREE.Vector3(0, 1, 0),
-    transparent: true,
-  },
-  // The remaining six fan out radially at 60° apart (with a shared upward
-  // lift) so exploding never sends two parts in near-enough directions to
-  // occlude each other on screen.
-  {
-    name: "Motherboard",
-    info: "The wiring hub every other part plugs into — without it, none of the pieces can talk to each other.",
-    color: 0x0f766e,
-    size: [3.6, 4.2, 0.15],
-    assembled: new THREE.Vector3(-1.6, 0, -1.5),
-    explodeDir: new THREE.Vector3(1, 0.5, 0),
-  },
-  {
-    name: "CPU",
-    info: "Executes instructions one at a time, extremely fast — the only part that actually computes.",
-    color: 0xd97706,
-    size: [0.5, 0.5, 0.15],
-    assembled: new THREE.Vector3(-1.6, 0.9, -1.35),
-    explodeDir: new THREE.Vector3(0.5, 0.5, 0.866),
-  },
-  {
-    name: "RAM",
-    info: "Holds what the CPU is using right now — fast, but forgets everything the instant the power cuts.",
-    color: 0x7c3aed,
-    size: [0.25, 1.6, 0.05],
-    assembled: new THREE.Vector3(-0.4, 0.6, -1.35),
-    explodeDir: new THREE.Vector3(0.5, 0.5, -0.866),
-  },
-  {
-    name: "GPU",
-    info: "Does the same simple arithmetic thousands of times at once — built for images, drafted for anything repetitive.",
-    color: 0xe11d48,
-    size: [3, 0.9, 1.4],
-    assembled: new THREE.Vector3(-1.6, -0.8, -1.2),
-    explodeDir: new THREE.Vector3(-0.5, 0.5, 0.866),
-  },
-  {
-    name: "PSU",
-    info: "Converts wall power into the exact voltages every other part needs — nothing else in the box can safely take mains power directly.",
-    color: 0x0284c7,
-    size: [1.8, 1.8, 1.6],
-    assembled: new THREE.Vector3(1.4, 1.6, -0.8),
-    explodeDir: new THREE.Vector3(-0.5, 0.5, -0.866),
-  },
-  {
-    name: "Storage",
-    info: "The only part that still remembers anything after the power is off.",
-    color: 0x059669,
-    size: [1, 1, 0.3],
-    assembled: new THREE.Vector3(1.4, -1.6, 1.2),
-    explodeDir: new THREE.Vector3(-1, 0.5, 0),
-  },
-];
-
-const containerQuery = document.querySelector<HTMLDivElement>('[data-testid="scene"]');
-const toggleQuery = document.querySelector<HTMLButtonElement>("#explode-toggle");
-const infoPanelQuery = document.querySelector<HTMLElement>('[data-testid="part-info"]');
-
-if (containerQuery && toggleQuery && infoPanelQuery) {
-  const container = containerQuery;
-  const toggle = toggleQuery;
-  const infoPanel = infoPanelQuery;
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf4f4f5);
-
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(8, 10, 12);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  container.appendChild(renderer.domElement);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.target.set(0, 0, 0);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const key = new THREE.DirectionalLight(0xffffff, 0.9);
-  key.position.set(5, 8, 6);
-  scene.add(key);
-
-  const meshes = PARTS.map((part) => {
-    const geometry = new THREE.BoxGeometry(...part.size);
-    const material = new THREE.MeshStandardMaterial(
-      part.transparent
-        ? { color: part.color, transparent: true, opacity: 0.16, depthWrite: false }
-        : { color: part.color },
-    );
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(part.assembled);
-    mesh.userData.part = part;
-    scene.add(mesh);
-    return mesh;
-  });
-
-  function resize() {
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-  }
-  window.addEventListener("resize", resize);
-  resize();
-
-  const EXPLODE_DISTANCE = 6;
-  let exploded = false;
-  let progress = 0; // 0 = assembled, 1 = exploded
-
-  toggle.addEventListener("click", () => {
-    exploded = !exploded;
-    toggle.setAttribute("aria-pressed", String(exploded));
-    toggle.textContent = exploded ? "Reassemble" : "Explode";
-  });
-
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
-
-  function showPart(part: Part) {
-    infoPanel.innerHTML = "";
-    const heading = document.createElement("h2");
-    heading.textContent = part.name;
-    const body = document.createElement("p");
-    body.textContent = part.info;
-    infoPanel.append(heading, body);
-  }
-
-  renderer.domElement.addEventListener("click", (event) => {
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(meshes);
-    // The Case is see-through on purpose; don't let its (invisible) surface
-    // win a click over a solid part sitting behind it in the same ray.
-    const hit = hits.find((h) => !(h.object.userData.part as Part).transparent) ?? hits[0];
-    if (hit) showPart(hit.object.userData.part as Part);
-  });
-
-  function animate() {
-    requestAnimationFrame(animate);
-    const target = exploded ? 1 : 0;
-    progress += (target - progress) * 0.08;
-    for (const mesh of meshes) {
-      const part = mesh.userData.part as Part;
-      mesh.position.copy(part.assembled).addScaledVector(part.explodeDir, progress * EXPLODE_DISTANCE);
+function animatePositions(direction: "out" | "in"): Promise<void> {
+  return new Promise((resolve) => {
+    const tl = gsap.timeline({ onComplete: resolve });
+    for (const part of PARTS) {
+      const group = groupsById.get(part.id);
+      if (!group) continue;
+      const assembled = part.assembled;
+      const exploded = assembled.clone().addScaledVector(part.explodeDir, EXPLODE_DISTANCE);
+      const to = direction === "out" ? exploded : assembled;
+      // Explode outward glass-first, case-last (real teardown order); reverse
+      // that for reassembly so the frame goes back together before the
+      // panel closes over it, matching real assembly direction.
+      const stagger = direction === "out" ? part.order : maxOrder - part.order;
+      const delay = REDUCED_MOTION ? 0 : stagger * DURATION.explodeStagger;
+      const duration = REDUCED_MOTION ? 0.2 : DURATION.explodePartDuration;
+      tl.to(group.position, { x: to.x, y: to.y, z: to.z, duration, ease: "power2.inOut" }, delay);
     }
-    controls.update();
-    renderer.render(scene, camera);
-  }
-  animate();
+  });
 }
+
+function focusPositionFor(group: THREE.Group) {
+  const target = new THREE.Vector3();
+  group.getWorldPosition(target);
+  const position = target.clone().add(new THREE.Vector3(1.7, 1.15, 2.5));
+  return { position, target };
+}
+
+async function explode() {
+  if (!sm.is("assembled")) return;
+  sm.transition("opening");
+  ui.setExploded(true);
+  await Promise.all([
+    animatePositions("out"),
+    flyCamera(
+      camera,
+      controls,
+      new THREE.Vector3(...CAMERA.exploded.position),
+      new THREE.Vector3(...CAMERA.exploded.target),
+    ),
+  ]);
+  sm.transition("exploded");
+}
+
+async function reassemble() {
+  if (!sm.is("exploded") && !sm.is("focusing") && !sm.is("detail")) return;
+  if (ui.isPanelOpen()) ui.hidePanel();
+  currentPartId = null;
+  hoveredGroup = null;
+  refreshDimState();
+  if (!sm.is("exploded")) sm.transition("exploded");
+  sm.transition("reassembling");
+  ui.setExploded(false);
+  await Promise.all([
+    animatePositions("in"),
+    flyCamera(
+      camera,
+      controls,
+      new THREE.Vector3(...CAMERA.assembled.position),
+      new THREE.Vector3(...CAMERA.assembled.target),
+    ),
+  ]);
+  sm.transition("assembled");
+}
+
+async function selectPart(part: PartDef) {
+  if (sm.is("assembled")) await explode();
+  if (!sm.is("exploded") && !sm.is("detail")) return;
+  const group = groupsById.get(part.id);
+  if (!group) return;
+  sm.transition("focusing");
+  currentPartId = part.id;
+  refreshDimState();
+  const { position, target } = focusPositionFor(group);
+  await flyCamera(camera, controls, position, target);
+  sm.transition("detail");
+  ui.showPanel(part);
+}
+
+async function closeDetail() {
+  if (!sm.is("detail") && !sm.is("focusing")) return;
+  currentPartId = null;
+  refreshDimState();
+  await flyCamera(
+    camera,
+    controls,
+    new THREE.Vector3(...CAMERA.exploded.position),
+    new THREE.Vector3(...CAMERA.exploded.target),
+  );
+  sm.transition("exploded");
+}
+
+ui.onExplodeToggle(() => {
+  if (sm.is("assembled")) void explode();
+  else void reassemble();
+});
+
+ui.onPartChosen((part) => void selectPart(part));
+ui.onPanelClose(() => void closeDetail());
+ui.onEscape(() => void closeDetail());
+ui.onPanelStep((direction) => {
+  if (!currentPartId) return;
+  const idx = PARTS.findIndex((p) => p.id === currentPartId);
+  const next = PARTS[(idx + direction + PARTS.length) % PARTS.length];
+  void selectPart(next);
+});
+
+setupInteraction(
+  renderer,
+  camera,
+  [...groupsById.values()],
+  {
+    onHover(part) {
+      hoveredGroup = part ? (groupsById.get(part.id) ?? null) : null;
+      if (!hoveredGroup) ui.setHoverLabel(null, 0, 0);
+      refreshDimState();
+    },
+    onSelect(part) {
+      void selectPart(part);
+    },
+  },
+  () => sm.is("exploded", "focusing", "detail"),
+);
+
+ui.setExploded(false);
+window.addEventListener("resize", resize);
+resize();
+
+const clock = new THREE.Clock();
+const labelWorldPos = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (document.hidden) return;
+  const dt = clock.getDelta();
+  if (sm.is("assembled") && !REDUCED_MOTION) {
+    computer.rotation.y += AUTO_ROTATE_SPEED * dt;
+  }
+  controls.update();
+  if (hoveredGroup) {
+    hoveredGroup.getWorldPosition(labelWorldPos);
+    labelWorldPos.project(camera);
+    const x = (labelWorldPos.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+    const y = (-labelWorldPos.y * 0.5 + 0.5) * renderer.domElement.clientHeight;
+    ui.setHoverLabel((hoveredGroup.userData.part as PartDef).name, x, y);
+  }
+  renderer.render(scene, camera);
+}
+animate();
