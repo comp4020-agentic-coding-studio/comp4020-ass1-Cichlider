@@ -1,83 +1,56 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and each brief adds its own word count and moment count.
-
 ## What I built
 
-One paragraph: the thing, and the idea behind it.
+An interactive exploded-view of a desktop computer. The point of view is in the
+scope: a computer looks like one sealed box, but it's really only seven
+physical objects, each doing a job none of the others can do. Click **Explode**
+to pull the case, motherboard, CPU, RAM, GPU, PSU and storage apart in 3D, then
+click any part to read what it does. Geometry is deliberately plain (coloured
+boxes, not textured models) --- the idea is the seven-way division of labour,
+not a realistic render.
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+1. **Scoping "explode a computer" down to exactly seven parts.** A real
+   computer has dozens of components, and the brief rewards one strong idea,
+   not an inventory. Rather than defaulting to a more literal, more detailed
+   model (closer to the course's own [Mechanical
+   Watch](https://ciechanow.ski/mechanical-watch/) exemplar), I fixed the
+   boundary at seven and wrote the constraint into the copy itself --- each
+   part's description had to name a job the other six structurally can't do.
+   I checked this held by reading all seven descriptions against each other
+   and cutting anything where two jobs blurred together, before writing any
+   3D code.
+   ([`edc6cfc`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-Cichlider/commit/edc6cfc))
 
-1. **what happened** --- the problem, or the thing the agent got wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+2. **A transparent mesh still wins a raycast.** Early testing only ever
+   surfaced 4 of the 7 parts as clickable. Manually clicking screenshots
+   suggested it was just imprecise aim, but that was the wrong diagnosis: the
+   see-through case shell (`opacity: 0.16`) was intercepting clicks meant for
+   solid parts behind it, because `intersectObjects()` returns geometric
+   distance, not visual opacity. Instead of quietly patching `main.ts` and
+   moving on, I wrote the rule into `CLAUDE.md` --- skip transparent-marked
+   hits when a solid one exists in the same ray --- so it's a standing check
+   for any future week that reuses this pattern, not a one-off fix.
+   ([`eb852a6`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-Cichlider/commit/eb852a6))
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** rather than in another prompt --- a rule added to
-`CLAUDE.md`, a check wired up, an attempt thrown away: re-prompting until it
-passes is the routine case, and changing what the agent works against is the
-skilled one.
+3. **Verifying by computed projection instead of eyeballed pixels.** The
+   obvious way to test "is this part clickable" is to look at a screenshot and
+   guess a coordinate --- which is exactly what produced the false "imprecise
+   aim" read in moment 2, and separately mis-clicked RAM as CPU. I replaced
+   that with a script that reconstructs the scene's actual camera (eye
+   position, fov, aspect) and projects each part's fully-exploded world
+   position to a screen coordinate, then clicks precisely there. Re-running it
+   after the raycaster fix confirmed all seven parts respond with the correct
+   name and zero console errors, at both marking viewports (1920×1080 and
+   390×844). That distinction --- computed, not guessed --- is now a
+   standing rule in `CLAUDE.md` rather than something I'd have to relearn next
+   time a canvas-based interaction needs testing.
+   ([`eb852a6`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-Cichlider/commit/eb852a6))
 
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
-
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
-
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
-
-> the prompt, verbatim
-
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
-
-### A worked moment, for shape
-
-Delete this section along with the rest of the boilerplate --- it's here to show
-the four jobs in one paragraph, not to be imitated in content.
-
-> The date formatter kept coming back with `toLocaleDateString()` and no locale
-> argument, so the same build rendered differently on my machine and in CI. I'd
-> already re-prompted it twice, which fixed the line but not the habit, so the
-> third time I put the rule in `CLAUDE.md` instead
-> ([`3f9ac21`](https://github.com/YOUR-ORG/YOUR-REPO/commit/3f9ac21)) and added
-> a spec test that fails on a bare `toLocaleDateString`. That's what told me it
-> had actually taken: the test went red against the old code and green against
-> the new, and the next two features it wrote passed it without prompting
-> ([`3f9ac21...b7e0d14`](https://github.com/YOUR-ORG/YOUR-REPO/compare/3f9ac21...b7e0d14)).
-
-## Before you ship
-
-`pnpm check:evidence` verifies your citations resolve to real commits, that the
-current reflection entry is in `reflections/`, and that your `CLAUDE.md` is
-there --- before a marker ever opens the file. It checks that your map is
-traceable, not that it is good: the marker judges whether your small,
-deliberately chosen set of moments shows real judgement and reflection. A green
-check is not a substitute for that curation.
-
-Images are deliberately not checked, because whether one renders is visible the
-moment you look. Open this file on GitHub and look at it before you ship.
+A note on the commit trail: the first two commits above cover more ground each
+than they should --- the case/raycaster bug was found and fixed before
+anything was committed, so there's no red-to-green range to point at for it,
+only the after-state. That's a process gap, not a hidden one: smaller, more
+frequent commits are the fix, starting this week.
