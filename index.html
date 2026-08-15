@@ -1,27 +1,32 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>桌面电脑爆炸视图 — 交互式部件解析</title>
+    <title>Desktop Computer — Exploded View</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <h1 class="sr-only">桌面电脑爆炸视图 — 交互式部件解析</h1>
+    <h1 class="sr-only">Desktop Computer — Exploded View</h1>
 
     <div id="app">
-      <div id="scene" data-testid="scene" role="img" aria-label="桌面电脑的三维爆炸视图，可拖拽旋转"></div>
+      <div
+        id="scene"
+        data-testid="scene"
+        role="img"
+        aria-label="Interactive 3D exploded view of a desktop computer, drag to rotate"
+      ></div>
 
       <header class="hud">
-        <p class="hud-tag">桌面电脑 · 拆解</p>
+        <p class="hud-tag">DESKTOP COMPUTER · EXPLODED VIEW</p>
         <button type="button" id="explode-toggle" data-testid="explode-trigger" aria-pressed="false">
-          探索内部
+          Explore Inside
         </button>
       </header>
 
       <div class="hover-label" id="hover-label" aria-hidden="true"></div>
 
-      <nav class="kbd-parts" id="kbd-parts" aria-label="按部件名称选择（键盘可用）"></nav>
+      <nav class="kbd-parts" id="kbd-parts" aria-label="Select a part by name (keyboard accessible)"></nav>
 
       <aside
         class="detail-panel"
@@ -29,12 +34,14 @@
         data-testid="part-info"
         role="dialog"
         aria-modal="false"
-        aria-label="部件详情"
+        aria-label="Part details"
         aria-hidden="true"
         inert
         tabindex="-1"
       >
-        <button type="button" class="panel-close" id="panel-close" aria-label="关闭详情，返回爆炸视图">✕</button>
+        <button type="button" class="panel-close" id="panel-close" aria-label="Close details, return to exploded view">
+          ✕
+        </button>
         <p class="panel-index" id="panel-index"></p>
         <h2 id="panel-name"></h2>
         <p class="panel-abbr" id="panel-abbr"></p>
@@ -42,25 +49,25 @@
         <p class="panel-explain" id="panel-explain"></p>
         <dl class="panel-facts">
           <div>
-            <dt>负责什么</dt>
+            <dt>Responsibility</dt>
             <dd id="panel-responsibility"></dd>
           </div>
           <div>
-            <dt>为什么重要</dt>
+            <dt>Why it matters</dt>
             <dd id="panel-importance"></dd>
           </div>
           <div>
-            <dt>规格举例</dt>
+            <dt>Typical spec</dt>
             <dd id="panel-spec"></dd>
           </div>
         </dl>
         <div class="panel-nav">
-          <button type="button" id="panel-prev">上一个</button>
-          <button type="button" id="panel-next">下一个</button>
+          <button type="button" id="panel-prev">Previous Part</button>
+          <button type="button" id="panel-next">Next Part</button>
         </div>
       </aside>
 
-      <p class="empty-state" id="empty-state">点击「探索内部」，或点击任意部件查看详情。</p>
+      <p class="empty-state" id="empty-state">Select Explore Inside, or click the computer to begin.</p>
     </div>
 
     <script type="module" src="./main.ts"></script>

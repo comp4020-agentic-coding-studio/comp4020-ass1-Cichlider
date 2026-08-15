@@ -1,10 +1,26 @@
 :root {
-  --bg: #05070a;
-  --panel-bg: rgb(10 14 20 / 92%);
+  /* Page/scene backdrop is now a bright cool gray, not a black void — see
+     src/config.ts COLORS.background for the matching Three.js scene color.
+     --ink/--ink-dim/--accent stay LIGHT because they're the detail panel's
+     own dark-glass theme (the panel keeps its dark industrial look even
+     though the page around it is bright); HUD chrome that sits directly on
+     the light 3D canvas uses the separate --surface-* tokens below instead. */
+  --bg: #dae1e7;
+  --panel-bg: rgb(16 20 26 / 93%);
   --accent: #38e0ff;
   --ink: #e6f1f5;
   --ink-dim: #8fa3ad;
   --border: rgb(56 224 255 / 18%);
+
+  /* Tokens for HUD elements floating over the bright canvas: dark text and a
+     light frosted chip, so contrast holds regardless of what's rendered
+     behind them. */
+  --surface-chip-bg: rgb(255 255 255 / 72%);
+  --surface-chip-bg-strong: rgb(255 255 255 / 88%);
+  --surface-ink: #17212b;
+  --surface-ink-dim: #4c5a66;
+  --surface-accent: #0e7490;
+  --surface-border: rgb(23 33 43 / 16%);
 }
 
 * {
@@ -17,7 +33,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  font-family: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;
 }
 
@@ -68,7 +84,7 @@ body {
   font-size: 0.75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--surface-ink-dim);
 }
 
 #explode-toggle {
@@ -76,16 +92,17 @@ body {
   padding: 0.65rem 1.6rem;
   font-size: 0.95rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgb(10 16 22 / 70%);
-  color: var(--accent);
+  border: 1px solid var(--surface-border);
+  background: var(--surface-chip-bg);
+  color: var(--surface-accent);
   cursor: pointer;
   backdrop-filter: blur(6px);
+  box-shadow: 0 1px 3px rgb(23 33 43 / 12%);
   transition: background 0.2s, transform 0.15s;
 }
 
 #explode-toggle:hover {
-  background: rgb(56 224 255 / 12%);
+  background: var(--surface-chip-bg-strong);
 }
 
 #explode-toggle:active {
@@ -93,13 +110,13 @@ body {
 }
 
 #explode-toggle:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--surface-accent);
   outline-offset: 3px;
 }
 
 #explode-toggle[aria-pressed="true"] {
-  color: var(--ink);
-  border-color: rgb(56 224 255 / 45%);
+  color: var(--surface-ink);
+  border-color: rgb(14 116 144 / 45%);
 }
 
 .hover-label {
@@ -109,14 +126,15 @@ body {
   padding: 0.3rem 0.7rem;
   font-size: 0.8rem;
   border-radius: 0.35rem;
-  background: rgb(5 7 10 / 85%);
-  color: var(--accent);
-  border: 1px solid var(--border);
+  background: var(--surface-chip-bg-strong);
+  color: var(--surface-accent);
+  border: 1px solid var(--surface-border);
   pointer-events: none;
   transform: translate(-50%, -140%);
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.12s ease;
+  box-shadow: 0 1px 3px rgb(23 33 43 / 14%);
 }
 
 .hover-label.visible {
@@ -141,7 +159,8 @@ body {
   margin: 0;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--ink-dim);
+  color: var(--surface-ink-dim);
+  text-shadow: 0 1px 2px rgb(255 255 255 / 60%);
   pointer-events: none;
   transition: opacity 0.3s ease;
 }

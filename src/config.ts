@@ -3,29 +3,66 @@
 // not hunting through model.ts or ui.ts.
 
 export const COLORS = {
-  background: 0x05070a,
-  accent: 0x38e0ff, // the single cyan/ice-blue accent used everywhere
-  chassis: 0x2a2f36, // gunmetal — case frame, brackets
-  chassisDark: 0x1b1e23,
-  pcb: 0x15321f, // dark PCB green — motherboard, RAM, GPU, SSD substrate
-  pcbTrace: 0x0a1a10,
-  metalCooler: 0xb9c2c9, // brushed aluminium
-  metalCopper: 0xb5651d,
-  plasticDark: 0x14161a,
-  glass: 0x8fd8e8,
+  background: 0xdae1e7, // bright cool-gray studio backdrop (was near-black)
+  backgroundGround: 0xb9c2ca, // slightly deeper — the floor the case sits on
+  accent: 0x38e0ff, // cyan accent — reserved for small highlights/interaction, never large surfaces
+  chassis: 0x565f68, // graphite gray — case frame, brackets (was near-black gunmetal)
+  chassisDark: 0x3a4048, // darker graphite for recessed panels, still well above zero luminance
+  pcb: 0x35513f, // PCB green — motherboard, RAM, GPU, SSD substrate, lightened for readability
+  pcbTrace: 0x1f3a28,
+  metalCooler: 0xcbd2d8, // brushed aluminium
+  metalCopper: 0xc17a34,
+  plasticDark: 0x2c3138, // dark plastic shrouds — dark but never near-black
+  glass: 0xdcedf2,
   gold: 0xcaa14a, // CPU contact pins
 } as const;
 
 export const EXPLODE_DISTANCE = 3.4;
 export const AUTO_ROTATE_SPEED = 0.12; // rad/s while assembled and idle
 
+// Front 3/4 view from the glass side, close to the case's own mid-height —
+// a real product photo doesn't look down on a tower from above, and a
+// top-down hero shot was hiding the front/glass/interior relationship this
+// model exists to show.
 export const CAMERA = {
   fov: 42,
   near: 0.1,
   far: 100,
-  assembled: { position: [7.5, 5.5, 9] as [number, number, number], target: [0, 0, 0] as [number, number, number] },
-  exploded: { position: [8.5, 6, 11] as [number, number, number], target: [0, 0, 0] as [number, number, number] },
+  assembled: { position: [4.6, 0.9, 6.2] as [number, number, number], target: [0, -0.1, 0] as [number, number, number] },
+  exploded: { position: [6.6, 1.5, 8.6] as [number, number, number], target: [0, -0.1, 0] as [number, number, number] },
 };
+
+// A single ATX-mid-tower coordinate system and scale (1 world unit = 100mm),
+// shared by model.ts (geometry) and parts-data.ts (assembled/explode
+// positions), so no part's placement is a standalone guess. Axes:
+//   X: - = motherboard tray side, + = glass side (the side the user views)
+//   Y: - = bottom, + = top
+//   Z: - = rear (I/O side), + = front
+export const LAYOUT = {
+  case: { hx: 1.1, hy: 2.3, hz: 2.2, wall: 0.05 },
+  trayX: -1.05, // inner face of the tray wall the motherboard bolts to
+  board: {
+    x: -1.0, // board's own thin plane, flush against the tray with standoff clearance
+    thickness: 0.06,
+    // ATX is 305 x 244mm; mapped so the 305mm edge runs vertically (Y) and
+    // the 244mm edge runs front-to-back (Z), rear edge flush to the case's
+    // rear I/O cutout — the standard tower mounting orientation.
+    height: 3.0,
+    depth: 2.4,
+    centerY: 0.27,
+    centerZ: -0.92,
+    rearZ: -2.12,
+  },
+  // World-space anchor for the CPU socket: CPU and cooler both mount flush
+  // to this exact point (CPU thin against the board face, cooler's base
+  // stacked directly against the CPU), so they can never drift apart.
+  cpuSocket: { x: -0.95, y: 0.85, z: -1.35 },
+  ram: { x: -0.75, y: 0.9, z: -0.8 }, // adjacent DIMM slots, front-side of the socket
+  ssd: { x: -0.95, y: 0.1, z: -1.0 }, // M.2 slot, below the socket, flush to board face
+  pcieSlot: { x: -0.95, y: -0.6, z: -1.82 }, // GPU's edge-connector meets the board here
+  psu: { x: 0, y: -1.8, z: -1.45 }, // bottom-rear bay
+  caseFan: { x: 0, y: 1.0, z: -2.15 }, // rear exhaust, flush to the rear wall
+} as const;
 
 export const DURATION = {
   explodeStagger: 0.09, // seconds between each part's explode start

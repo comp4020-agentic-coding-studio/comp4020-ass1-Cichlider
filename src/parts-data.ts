@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { LAYOUT } from "./config.ts";
 
 export type GeometryKind =
   | "case-frame"
@@ -14,9 +15,9 @@ export type GeometryKind =
 
 export interface PartContent {
   id: string;
-  name: string; // Chinese name
-  abbr: string; // English abbreviation, e.g. "CPU"
-  definition: string; // <= 25 Chinese characters
+  name: string;
+  abbr: string; // short label, e.g. "CPU"
+  definition: string; // one-line tagline, <= 8 words
   explanation: string; // 2-3 sentences
   responsibility: string;
   importance: string;
@@ -26,151 +27,188 @@ export interface PartContent {
 export interface PartDef extends PartContent {
   geometry: GeometryKind;
   assembled: THREE.Vector3;
-  explodeDir: THREE.Vector3; // unit vector
+  explodeDir: THREE.Vector3; // NOT always unit length — see note below
   order: number; // stagger order in the explode sequence (0 = first to move)
 }
 
+// Every connector on the vertically-mounted board (DIMM, PCIe, M.2 standoff,
+// the CPU socket itself) releases the same way: pulling away from the board's
+// face, i.e. +X. `dir()` normalizes so each of those parts travels the full
+// shared EXPLODE_DISTANCE, which is deliberate — it produces a readable
+// "exploded column" spread out along X, ordered by each part's own Y/Z anchor,
+// which is how real exploded-view diagrams read. Two parts are the exception
+// and skip `dir()`: the CPU only lifts "slightly" out of its socket once the
+// cooler is off, and the case frame should only settle a short distance, not
+// fly off with the same magnitude as everything it contains — both get a
+// hand-written non-unit vector instead.
 const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).normalize();
 
-// Order/content follow real assembly logic: the glass panel comes off first
-// (it's the outermost, purely cosmetic layer), then the large add-in parts
-// (GPU, cooler), then the small ones (RAM, SSD, fan), then the motherboard
-// and case frame last, since everything else was mounted to them.
+// Order/content follow the real teardown sequence for a tower case, mounted
+// board vertical, glass side toward the viewer: glass panel off first (it's
+// the outermost, purely cosmetic layer) → GPU unclipped from the PCIe slot →
+// CPU cooler lifted off → RAM levered out of its DIMM slots → CPU lifted out
+// of the now-exposed socket → M.2 SSD unscrewed from the board → PSU slid out
+// of its rear-facing bay → rear exhaust fan unscrewed from the rear wall →
+// motherboard unscrewed from the tray last, since every other part depended
+// on it being in place. The case frame itself only settles slightly, last of
+// all — it's the thing everything else was mounted inside, not a part that
+// "explodes off" of anything.
 export const PARTS: PartDef[] = [
   {
     id: "glass",
-    name: "玻璃侧板",
+    name: "Glass Side Panel",
     abbr: "Glass Panel",
-    definition: "透明侧板，展示内部做工",
+    definition: "A transparent side, showing off the build",
     explanation:
-      "钢化玻璃侧板取代传统钢板，让使用者无需拆机即可看到内部布线与运行状态。它几乎不参与散热，却已经成为现代机箱的事实标准。",
-    responsibility: "提供可视性，同时维持机箱结构完整",
-    importance: "纯装饰性部件，但拆下它是打开机箱的第一步",
-    specFact: "常见厚度 4mm 钢化玻璃",
+      "Tempered glass replaces a traditional steel side panel, letting you see the cabling and running hardware without opening the case. It barely helps cooling at all, yet it's become the de facto standard on modern cases.",
+    responsibility: "Provides visibility while keeping the case structurally sealed",
+    importance: "Purely cosmetic, but removing it is the first step to opening the case",
+    specFact: "Typically 4mm tempered glass",
     geometry: "glass-panel",
-    assembled: new THREE.Vector3(1.62, 0, 0),
-    explodeDir: dir(1, 0.1, 0),
+    assembled: new THREE.Vector3(LAYOUT.case.hx + 0.05, 0, 0),
+    explodeDir: dir(1, 0.05, 0),
     order: 0,
   },
   {
     id: "gpu",
-    name: "显卡",
+    name: "Graphics Card",
     abbr: "GPU",
-    definition: "并行处理图像与批量运算",
+    definition: "Renders images, in parallel, by the thousands",
     explanation:
-      "GPU 把同一种简单运算铺开到成百上千个核心上并行执行，天生适合图像渲染，也被借用来做训练等重复性计算。它的工作方式与 CPU 的“顺序执行”正好互补。",
-    responsibility: "并行渲染图形，承担大规模数值计算",
-    importance: "决定画面表现与并行计算能力的上限",
-    specFact: "常见显存容量 8–24GB GDDR6",
+      "A GPU spreads one simple operation across thousands of cores running in parallel — a natural fit for rendering, and borrowed for any workload that's repetitive at scale. That's the opposite of how a CPU works through instructions one after another.",
+    responsibility: "Renders graphics in parallel and handles large-scale numeric work",
+    importance: "Sets the ceiling on both visual output and parallel compute throughput",
+    specFact: "Typically 8–24GB of GDDR6 memory",
     geometry: "gpu",
-    assembled: new THREE.Vector3(-0.9, -0.55, 0.55),
-    explodeDir: dir(-0.3, -0.5, 0.9),
+    assembled: new THREE.Vector3(LAYOUT.pcieSlot.x, LAYOUT.pcieSlot.y, LAYOUT.pcieSlot.z),
+    explodeDir: dir(1, 0.15, -0.25),
     order: 1,
   },
   {
     id: "cooler",
-    name: "散热器",
+    name: "CPU Cooler",
     abbr: "CPU Cooler",
-    definition: "把 CPU 产生的热量导出机箱",
+    definition: "Carries heat away from the CPU",
     explanation:
-      "散热器通过热管把 CPU 核心的热量导向散热鳍片，再由风扇把热量吹散。没有它，CPU 会在几秒内因过热而降频甚至损坏。",
-    responsibility: "导出 CPU 热量并维持安全工作温度",
-    importance: "直接决定 CPU 能否维持标称频率运行",
-    specFact: "常见塔式散热器高度约 150–165mm",
+      "The cooler pipes heat away from the CPU's core through heat pipes into a stack of fins, then a fan blows that heat away. Without it, the CPU would overheat and throttle — or fail — within seconds.",
+    responsibility: "Removes CPU heat and keeps it within a safe operating temperature",
+    importance: "Directly determines whether the CPU can sustain its rated clock speed",
+    specFact: "Tower coolers typically stand 150–165mm tall",
     geometry: "cooler",
-    assembled: new THREE.Vector3(0.2, 0.55, -0.9),
-    explodeDir: dir(0.15, 0.9, -0.1),
+    assembled: new THREE.Vector3(LAYOUT.cpuSocket.x, LAYOUT.cpuSocket.y, LAYOUT.cpuSocket.z),
+    // Deliberately non-unit, like CPU/case below: a full-magnitude vertical
+    // unit vector at the shared EXPLODE_DISTANCE would lift the cooler to
+    // roughly y=4.2 — right at the edge of the exploded camera's vertical
+    // frustum, so it read as flying off-screen rather than lifting clear of
+    // the CPU. This caps it well inside frame while still separating cleanly
+    // from the socket below.
+    explodeDir: new THREE.Vector3(0.15, 0.55, 0.05),
     order: 2,
   },
   {
     id: "ram",
-    name: "内存条",
+    name: "Memory",
     abbr: "RAM",
-    definition: "CPU 当前数据的高速暂存区",
+    definition: "The CPU's fast, short-term scratchpad",
     explanation:
-      "内存保存 CPU 正在处理的数据与指令，读写速度远高于存储硬盘，但断电后内容立即丢失。它像一张不断被翻阅又清空的工作台。",
-    responsibility: "为 CPU 提供高速可读写的临时数据空间",
-    importance: "容量或速度不足，会让再快的 CPU 也被迫等待",
-    specFact: "常见规格 DDR5 16–32GB 双通道",
+      "RAM holds whatever data and instructions the CPU is actively working with, far faster to read and write than storage — but it forgets everything the instant power is lost. Think of it as a workbench that's constantly being cleared and reloaded.",
+    responsibility: "Gives the CPU a fast, read-write space for data in use",
+    importance: "Too little capacity or bandwidth forces even a fast CPU to sit idle waiting",
+    specFact: "Typically DDR5, 16–32GB in dual-channel",
     geometry: "ram",
-    assembled: new THREE.Vector3(0.75, 0.35, -0.75),
-    explodeDir: dir(0.6, 0.5, -0.6),
+    assembled: new THREE.Vector3(LAYOUT.ram.x, LAYOUT.ram.y, LAYOUT.ram.z),
+    explodeDir: dir(0.85, 0.5, 0.1),
     order: 3,
   },
   {
-    id: "ssd",
-    name: "固态硬盘",
-    abbr: "SSD / M.2",
-    definition: "断电后仍保留数据的存储部件",
+    id: "cpu",
+    name: "Processor",
+    abbr: "CPU",
+    definition: "Executes instructions, one after another, extremely fast",
     explanation:
-      "SSD 用闪存芯片持久化保存操作系统与文件，断电后数据依然存在——这是它与内存最本质的区别。M.2 接口直接插在主板上，省去了传统硬盘线缆。",
-    responsibility: "长期保存操作系统、程序与文件数据",
-    importance: "唯一断电后仍“记得”整机状态的部件",
-    specFact: "常见容量 1TB，NVMe 读速可达 7000MB/s",
-    geometry: "ssd",
-    assembled: new THREE.Vector3(-0.55, -0.15, -0.85),
-    explodeDir: dir(-0.6, -0.4, -0.7),
-    order: 3,
-  },
-  {
-    id: "fan",
-    name: "机箱风扇",
-    abbr: "Case Fan",
-    definition: "把机箱内的热空气排出",
-    explanation:
-      "机箱风扇在整机层面形成进风与排风的气流循环，配合散热器把各部件产生的热量最终排出机箱之外。风扇数量与朝向的搭配直接影响散热效率。",
-    responsibility: "形成机箱级气流循环，辅助整体散热",
-    importance: "没有它，局部散热再好也会在机箱内堆积热量",
-    specFact: "常见尺寸 120mm / 140mm PWM 风扇",
-    geometry: "fan",
-    assembled: new THREE.Vector3(0, -0.05, -1.55),
-    explodeDir: dir(0, 0.1, -1),
-    order: 3,
-  },
-  {
-    id: "motherboard",
-    name: "主板",
-    abbr: "Motherboard",
-    definition: "连接所有部件的通信枢纽",
-    explanation:
-      "主板上的电路把 CPU、内存、显卡与存储连接成一个整体，任何两个部件之间的信号都要经过它。芯片组选错了，其余部件再强也无法组合使用。",
-    responsibility: "承载并互连所有其他部件",
-    importance: "决定兼容性上限——插槽、内存代数、扩展槽都由它规定",
-    specFact: "常见尺寸 ATX 305×244mm",
-    geometry: "motherboard",
-    assembled: new THREE.Vector3(0, 0, -0.82),
-    explodeDir: dir(0, 0.2, -1),
+      "The CPU carries out the instruction stream nearly everything in the system depends on — sequential work, branching logic, and coordinating every other part. It sits under the cooler, seated in the socket, and is the single most latency-sensitive part in the machine.",
+    responsibility: "Executes instructions and coordinates the rest of the system",
+    importance: "Its clock speed and core count set the ceiling on single-thread and overall responsiveness",
+    specFact: "Typically 6–16 cores, socketed via LGA or PGA",
+    geometry: "cpu",
+    assembled: new THREE.Vector3(LAYOUT.cpuSocket.x, LAYOUT.cpuSocket.y, LAYOUT.cpuSocket.z),
+    explodeDir: new THREE.Vector3(0.35, 0.05, -0.05), // deliberately non-unit — "slightly out along the socket normal", once the cooler is off
     order: 4,
   },
   {
-    id: "psu",
-    name: "电源",
-    abbr: "PSU",
-    definition: "把市电转换成部件可用的电压",
+    id: "ssd",
+    name: "Solid-State Drive",
+    abbr: "SSD / M.2",
+    definition: "Keeps its data after the power goes off",
     explanation:
-      "电源模块把交流市电转换成主板、显卡与硬盘所需的多组直流电压，并在电压波动时提供缓冲保护。它是唯一直接连接市电的部件。",
-    responsibility: "稳定转换并分配整机所需电力",
-    importance: "电力不稳或不足，会导致整机随机重启或烧毁部件",
-    specFact: "常见额定功率 650–850W，80+ 金牌认证",
-    geometry: "psu",
-    assembled: new THREE.Vector3(-1.15, -1.05, 0.95),
-    explodeDir: dir(-0.6, -1, 0.5),
+      "An SSD stores the OS and files on flash chips that hold their charge without power — the fundamental difference from RAM. The M.2 form factor plugs straight into the motherboard, no cables needed.",
+    responsibility: "Holds the operating system, programs and files long-term",
+    importance: "The only part that still \"remembers\" the machine's state after a shutdown",
+    specFact: "Typically 1TB, with NVMe reads up to 7000MB/s",
+    geometry: "ssd",
+    assembled: new THREE.Vector3(LAYOUT.ssd.x, LAYOUT.ssd.y, LAYOUT.ssd.z),
+    explodeDir: dir(1, -0.2, 0.1),
     order: 5,
   },
   {
-    id: "case",
-    name: "机箱框架",
-    abbr: "Case Frame",
-    definition: "承载并固定所有部件的骨架",
+    id: "psu",
+    name: "Power Supply",
+    abbr: "PSU",
+    definition: "Converts mains power into usable voltages",
     explanation:
-      "机箱框架由钢或铝挤压成型，为所有部件提供固定点与走线空间，同时引导气流方向。它不参与运算，却决定了整机散热效率的上限。",
-    responsibility: "固定所有部件的相对位置，管理气流路径",
-    importance: "没有稳固的框架，其余部件无法保持对齐，气流也会紊乱",
-    specFact: "常见规格 ATX 中塔，约 480×210×450mm",
+      "The power supply converts AC mains power into the several DC voltages the motherboard, GPU and drives need, and buffers against power fluctuations along the way. It's the only part wired directly to mains power.",
+    responsibility: "Converts and distributes stable power to the whole system",
+    importance: "Unstable or insufficient power causes random reboots or damages components",
+    specFact: "Typically rated 650–850W, 80+ Gold certified",
+    geometry: "psu",
+    assembled: new THREE.Vector3(LAYOUT.psu.x, LAYOUT.psu.y, LAYOUT.psu.z),
+    explodeDir: dir(0, -0.3, -1),
+    order: 6,
+  },
+  {
+    id: "fan",
+    name: "Case Fan",
+    abbr: "Case Fan",
+    definition: "Pushes hot air out of the case",
+    explanation:
+      "Case fans set up an intake-and-exhaust airflow loop across the whole case, working with the cooler to actually carry heat out rather than just move it around inside. Fan count and placement have a direct effect on cooling efficiency.",
+    responsibility: "Establishes case-wide airflow to support overall cooling",
+    importance: "Without it, even great local cooling just lets heat build up inside the case",
+    specFact: "Typically 120mm or 140mm, PWM-controlled",
+    geometry: "fan",
+    assembled: new THREE.Vector3(LAYOUT.caseFan.x, LAYOUT.caseFan.y, LAYOUT.caseFan.z),
+    explodeDir: dir(0, 0.1, -1),
+    order: 7,
+  },
+  {
+    id: "motherboard",
+    name: "Motherboard",
+    abbr: "Motherboard",
+    definition: "The hub every other part connects through",
+    explanation:
+      "The motherboard's circuitry ties the CPU, memory, GPU and storage into one system — any signal between two parts passes through it. Pick the wrong chipset and the rest, however capable, simply can't work together.",
+    responsibility: "Hosts and interconnects every other component",
+    importance: "Sets the compatibility ceiling — socket, memory generation and expansion slots are all fixed by it",
+    specFact: "Typically ATX, 305×244mm",
+    geometry: "motherboard",
+    assembled: new THREE.Vector3(LAYOUT.board.x, LAYOUT.board.centerY, LAYOUT.board.centerZ),
+    explodeDir: dir(0.85, 0.35, 0.15),
+    order: 8,
+  },
+  {
+    id: "case",
+    name: "Case Frame",
+    abbr: "Case Frame",
+    definition: "The skeleton that holds everything in place",
+    explanation:
+      "The case frame is formed from steel or extruded aluminium, giving every part a mounting point and cable routing while shaping airflow. It does no computing at all, yet it sets the ceiling on the whole system's cooling.",
+    responsibility: "Fixes every part's position relative to the others and routes airflow",
+    importance: "Without a rigid frame, parts can't stay aligned and airflow turns chaotic",
+    specFact: "Typically an ATX mid-tower, roughly 480×210×450mm",
     geometry: "case-frame",
     assembled: new THREE.Vector3(0, 0, 0),
-    explodeDir: dir(0, -0.15, 1),
-    order: 6,
+    explodeDir: new THREE.Vector3(0.05, -0.05, 0.12), // deliberately non-unit — the case only settles slightly, it doesn't fly off itself
+    order: 9,
   },
 ];
 

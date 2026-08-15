@@ -45,7 +45,7 @@ export function setupUI(): UIHandles {
   for (const part of PARTS) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = `选择：${part.name}`;
+    btn.textContent = `Select: ${part.name}`;
     btn.addEventListener("click", () => partChosenHandlers.forEach((h) => h(part)));
     kbdParts.append(btn);
   }
@@ -105,7 +105,7 @@ export function setupUI(): UIHandles {
     },
     setExploded(exploded) {
       toggleButton.setAttribute("aria-pressed", String(exploded));
-      toggleButton.textContent = exploded ? "重新组装" : "探索内部";
+      toggleButton.textContent = exploded ? "Reassemble" : "Explore Inside";
       emptyState.classList.toggle("hidden", exploded);
     },
     onExplodeToggle(handler) {
