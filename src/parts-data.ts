@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LAYOUT } from "./config.ts";
+import { LAYOUT, QUEUE } from "./config.ts";
 
 export type GeometryKind =
   | "case-frame"
@@ -27,21 +27,10 @@ export interface PartContent {
 export interface PartDef extends PartContent {
   geometry: GeometryKind;
   assembled: THREE.Vector3;
-  explodeDir: THREE.Vector3; // NOT always unit length — see note below
-  order: number; // stagger order in the explode sequence (0 = first to move)
+  order: number; // stagger order in the teardown/reassemble animation (0 = first to move)
+  queueIndex: number; // this part's fixed slot in the museum queue, left to right
+  queueLabel: string; // short English name shown under the part in the queue
 }
-
-// Every connector on the vertically-mounted board (DIMM, PCIe, M.2 standoff,
-// the CPU socket itself) releases the same way: pulling away from the board's
-// face, i.e. +X. `dir()` normalizes so each of those parts travels the full
-// shared EXPLODE_DISTANCE, which is deliberate — it produces a readable
-// "exploded column" spread out along X, ordered by each part's own Y/Z anchor,
-// which is how real exploded-view diagrams read. Two parts are the exception
-// and skip `dir()`: the CPU only lifts "slightly" out of its socket once the
-// cooler is off, and the case frame should only settle a short distance, not
-// fly off with the same magnitude as everything it contains — both get a
-// hand-written non-unit vector instead.
-const dir = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).normalize();
 
 // Order/content follow the real teardown sequence for a tower case, mounted
 // board vertical, glass side toward the viewer: glass panel off first (it's
@@ -66,8 +55,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically 4mm tempered glass",
     geometry: "glass-panel",
     assembled: new THREE.Vector3(LAYOUT.case.hx + 0.05, 0, 0),
-    explodeDir: dir(1, 0.05, 0),
     order: 0,
+    queueIndex: 1,
+    queueLabel: "Glass Panel",
   },
   {
     id: "gpu",
@@ -81,8 +71,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically 8–24GB of GDDR6 memory",
     geometry: "gpu",
     assembled: new THREE.Vector3(LAYOUT.pcieSlot.x, LAYOUT.pcieSlot.y, LAYOUT.pcieSlot.z),
-    explodeDir: dir(1, 0.15, -0.25),
     order: 1,
+    queueIndex: 6,
+    queueLabel: "GPU",
   },
   {
     id: "cooler",
@@ -96,14 +87,9 @@ export const PARTS: PartDef[] = [
     specFact: "Tower coolers typically stand 150–165mm tall",
     geometry: "cooler",
     assembled: new THREE.Vector3(LAYOUT.cpuSocket.x, LAYOUT.cpuSocket.y, LAYOUT.cpuSocket.z),
-    // Deliberately non-unit, like CPU/case below: a full-magnitude vertical
-    // unit vector at the shared EXPLODE_DISTANCE would lift the cooler to
-    // roughly y=4.2 — right at the edge of the exploded camera's vertical
-    // frustum, so it read as flying off-screen rather than lifting clear of
-    // the CPU. This caps it well inside frame while still separating cleanly
-    // from the socket below.
-    explodeDir: new THREE.Vector3(0.15, 0.55, 0.05),
     order: 2,
+    queueIndex: 4,
+    queueLabel: "CPU Cooler",
   },
   {
     id: "ram",
@@ -117,8 +103,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically DDR5, 16–32GB in dual-channel",
     geometry: "ram",
     assembled: new THREE.Vector3(LAYOUT.ram.x, LAYOUT.ram.y, LAYOUT.ram.z),
-    explodeDir: dir(0.85, 0.5, 0.1),
     order: 3,
+    queueIndex: 5,
+    queueLabel: "RAM",
   },
   {
     id: "cpu",
@@ -132,8 +119,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically 6–16 cores, socketed via LGA or PGA",
     geometry: "cpu",
     assembled: new THREE.Vector3(LAYOUT.cpuSocket.x, LAYOUT.cpuSocket.y, LAYOUT.cpuSocket.z),
-    explodeDir: new THREE.Vector3(0.35, 0.05, -0.05), // deliberately non-unit — "slightly out along the socket normal", once the cooler is off
     order: 4,
+    queueIndex: 3,
+    queueLabel: "CPU",
   },
   {
     id: "ssd",
@@ -147,8 +135,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically 1TB, with NVMe reads up to 7000MB/s",
     geometry: "ssd",
     assembled: new THREE.Vector3(LAYOUT.ssd.x, LAYOUT.ssd.y, LAYOUT.ssd.z),
-    explodeDir: dir(1, -0.2, 0.1),
     order: 5,
+    queueIndex: 7,
+    queueLabel: "SSD",
   },
   {
     id: "psu",
@@ -162,8 +151,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically rated 650–850W, 80+ Gold certified",
     geometry: "psu",
     assembled: new THREE.Vector3(LAYOUT.psu.x, LAYOUT.psu.y, LAYOUT.psu.z),
-    explodeDir: dir(0, -0.3, -1),
     order: 6,
+    queueIndex: 8,
+    queueLabel: "PSU",
   },
   {
     id: "fan",
@@ -177,8 +167,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically 120mm or 140mm, PWM-controlled",
     geometry: "fan",
     assembled: new THREE.Vector3(LAYOUT.caseFan.x, LAYOUT.caseFan.y, LAYOUT.caseFan.z),
-    explodeDir: dir(0, 0.1, -1),
     order: 7,
+    queueIndex: 9,
+    queueLabel: "Fan",
   },
   {
     id: "motherboard",
@@ -192,8 +183,9 @@ export const PARTS: PartDef[] = [
     specFact: "Typically ATX, 305×244mm",
     geometry: "motherboard",
     assembled: new THREE.Vector3(LAYOUT.board.x, LAYOUT.board.centerY, LAYOUT.board.centerZ),
-    explodeDir: dir(0.85, 0.35, 0.15),
     order: 8,
+    queueIndex: 2,
+    queueLabel: "Motherboard",
   },
   {
     id: "case",
@@ -207,9 +199,38 @@ export const PARTS: PartDef[] = [
     specFact: "Typically an ATX mid-tower, roughly 480×210×450mm",
     geometry: "case-frame",
     assembled: new THREE.Vector3(0, 0, 0),
-    explodeDir: new THREE.Vector3(0.05, -0.05, 0.12), // deliberately non-unit — the case only settles slightly, it doesn't fly off itself
     order: 9,
+    queueIndex: 0,
+    queueLabel: "Case",
   },
 ];
 
 export const PART_BY_ID = new Map(PARTS.map((p) => [p.id, p]));
+
+// Parts in spatial queue order (left to right), for Previous/Next browsing —
+// distinct from PARTS' teardown order, which still drives animatePositions'
+// stagger timing (main.ts) and is unrelated to where a part sits in the row.
+export const PARTS_BY_QUEUE = [...PARTS].sort((a, b) => a.queueIndex - b.queueIndex);
+
+const QUEUE_MID = (PARTS_BY_QUEUE.length - 1) / 2;
+
+// Shared by the overview camera and every per-part focus shot (main.ts
+// computes focus shots from each part's live world-space bounding box, but
+// reuses this same offset direction so every shot "looks from the same
+// angle").
+export const QUEUE_VIEW_DIR = new THREE.Vector3(...QUEUE.viewDir).normalize();
+
+// Every part's fixed slot in the museum queue: one row, evenly spaced along
+// X, y=0 z=0 baseline. This is the ONLY place a part's exploded position is
+// computed — main.ts reads it directly rather than deriving anything, which
+// is what keeps repeated queue/reassemble cycles from drifting.
+export function queuePosition(part: PartDef): THREE.Vector3 {
+  return new THREE.Vector3((part.queueIndex - QUEUE_MID) * QUEUE.spacing, 0, 0);
+}
+
+// The default/"back to overview" camera: pulled back along the same shared
+// view direction, far enough to frame the entire queue row at once.
+export const QUEUE_OVERVIEW = {
+  target: new THREE.Vector3(0, 0, 0),
+  position: new THREE.Vector3(0, 0, 0).addScaledVector(QUEUE_VIEW_DIR, QUEUE.overviewDistance),
+};

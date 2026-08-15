@@ -35,7 +35,20 @@ function createMaterials() {
     // visible highlights — a near-zero-luminance color has nothing for light
     // to catch, which is what made the old case read as a black silhouette.
     chassis: mat(COLORS.chassis, { roughness: 0.45, metalness: 0.75 }),
-    chassisDark: mat(COLORS.chassisDark, { roughness: 0.55, metalness: 0.55 }),
+    // The flat panels (tray wall, rear/top/bottom, PSU shroud) are ghosted so
+    // the interior stays visible without opening the case — but only these
+    // large flat surfaces, never the structural posts/bezels (`chassis`
+    // above), so the frame still reads as solid metal. Opacity 0.62 keeps it
+    // clearly LESS transparent than the glass panel's 0.94 transmission — the
+    // case still reads as "a case", the glass still reads as "the see-through
+    // part". `isSeeThrough` (see glass, below) lets a click aimed at a part
+    // behind a ghosted panel land on that part instead of the panel, per the
+    // same firstSolidHit rule the glass already relies on.
+    chassisDark: (() => {
+      const chassisDark = mat(COLORS.chassisDark, { roughness: 0.55, metalness: 0.55, transparent: true, opacity: 0.62, depthWrite: false });
+      chassisDark.userData.isSeeThrough = true;
+      return chassisDark;
+    })(),
     cutout: mat(0x14171b, { roughness: 0.8, metalness: 0.1 }), // recessed I/O/vent cutouts — dark, not pure black
     pcb: mat(COLORS.pcb, { roughness: 0.6, metalness: 0.15 }),
     chip: mat(0x1c2027, { roughness: 0.4, metalness: 0.35 }),

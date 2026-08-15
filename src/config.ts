@@ -17,7 +17,6 @@ export const COLORS = {
   gold: 0xcaa14a, // CPU contact pins
 } as const;
 
-export const EXPLODE_DISTANCE = 3.4;
 export const AUTO_ROTATE_SPEED = 0.12; // rad/s while assembled and idle
 
 // Front 3/4 view from the glass side, close to the case's own mid-height —
@@ -29,7 +28,23 @@ export const CAMERA = {
   near: 0.1,
   far: 100,
   assembled: { position: [4.6, 0.9, 6.2] as [number, number, number], target: [0, -0.1, 0] as [number, number, number] },
-  exploded: { position: [6.6, 1.5, 8.6] as [number, number, number], target: [0, -0.1, 0] as [number, number, number] },
+};
+
+// The "exploded" state is no longer a radial burst — it's a fixed-order
+// horizontal museum queue. Every part sits at (queueIndex - middle) *
+// spacing along X, y=0, z=0: a single tidy row, not scattered around the
+// case. `viewDir` is shared by every part's focus shot and the overview;
+// each shot's actual distance is computed live in main.ts (computeFocusFor)
+// from the selected part's real world-space bounding box, not a fixed
+// number here — every part's group is scaled, at queue time, to the same
+// visual size (see main.ts), so that live computation lands on a
+// comparable distance for any part, which is what makes "unified display
+// height" actually true rather than just asserted.
+export const QUEUE = {
+  spacing: 3.2, // world units between adjacent queue slot centers
+  targetSize: 2.0, // every part is scaled so its largest dimension is this
+  viewDir: [1.7, 1.15, 2.5] as [number, number, number], // camera offset direction, shared by every part's focus and the overview
+  overviewDistance: 25, // camera distance to frame the entire queue at once
 };
 
 // A single ATX-mid-tower coordinate system and scale (1 world unit = 100mm),

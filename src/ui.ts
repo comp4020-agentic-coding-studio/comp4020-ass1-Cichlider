@@ -1,4 +1,4 @@
-import { PARTS, type PartDef } from "./parts-data.ts";
+import { PARTS, PARTS_BY_QUEUE, type PartDef } from "./parts-data.ts";
 
 export interface UIHandles {
   toggleButton: HTMLButtonElement;
@@ -7,6 +7,9 @@ export interface UIHandles {
   isPanelOpen: () => boolean;
   setHoverLabel: (text: string | null, x: number, y: number) => void;
   setExploded: (exploded: boolean) => void;
+  setQueueLabelsVisible: (visible: boolean) => void;
+  positionQueueLabel: (id: string, x: number, y: number) => void;
+  getPanelOverlayWidth: () => number;
   onExplodeToggle: (handler: () => void) => void;
   onPartChosen: (handler: (part: PartDef) => void) => void;
   onPanelClose: (handler: () => void) => void;
@@ -28,6 +31,7 @@ export function setupUI(): UIHandles {
   const panelPrev = el<HTMLButtonElement>("panel-prev");
   const panelNext = el<HTMLButtonElement>("panel-next");
   const hoverLabel = el<HTMLElement>("hover-label");
+  const queueLabels = el<HTMLElement>("queue-labels");
   const emptyState = el<HTMLElement>("empty-state");
   const panelIndex = el<HTMLElement>("panel-index");
   const panelName = el<HTMLElement>("panel-name");
@@ -50,9 +54,22 @@ export function setupUI(): UIHandles {
     kbdParts.append(btn);
   }
 
+  // One label per part, positioned every frame by main.ts (world→screen
+  // projection of each queue slot) rather than laid out in CSS — the queue's
+  // X positions are computed in world space (config.ts QUEUE.spacing), not
+  // pixels.
+  const queueLabelEls = new Map<string, HTMLElement>();
+  for (const part of PARTS_BY_QUEUE) {
+    const span = document.createElement("span");
+    span.className = "queue-label";
+    span.textContent = part.queueLabel;
+    queueLabels.append(span);
+    queueLabelEls.set(part.id, span);
+  }
+
   function showPanel(part: PartDef) {
-    const index = PARTS.findIndex((p) => p.id === part.id);
-    panelIndex.textContent = `${String(index + 1).padStart(2, "0")} / ${String(PARTS.length).padStart(2, "0")}`;
+    const index = PARTS_BY_QUEUE.findIndex((p) => p.id === part.id);
+    panelIndex.textContent = `${String(index + 1).padStart(2, "0")} / ${String(PARTS_BY_QUEUE.length).padStart(2, "0")}`;
     panelName.textContent = part.name;
     panelAbbr.textContent = part.abbr;
     panelDef.textContent = part.definition;
@@ -107,6 +124,26 @@ export function setupUI(): UIHandles {
       toggleButton.setAttribute("aria-pressed", String(exploded));
       toggleButton.textContent = exploded ? "Reassemble" : "Explore Inside";
       emptyState.classList.toggle("hidden", exploded);
+    },
+    setQueueLabelsVisible(visible) {
+      queueLabels.classList.toggle("visible", visible);
+    },
+    positionQueueLabel(id, x, y) {
+      const span = queueLabelEls.get(id);
+      if (!span) return;
+      span.style.left = `${x}px`;
+      span.style.top = `${y}px`;
+    },
+    getPanelOverlayWidth() {
+      // The panel's CSS width (and thus getBoundingClientRect().width) is
+      // unaffected by its open/closed transform, so this reads correctly
+      // even while the panel is currently slid off-screen. On the mobile
+      // breakpoint the panel becomes a full-width bottom drawer rather than
+      // a right-side overlay — detect that from measured layout (narrower
+      // than the window = right overlay) rather than duplicating the CSS
+      // breakpoint value here.
+      const rect = panel.getBoundingClientRect();
+      return rect.width < window.innerWidth - 1 ? rect.width : 0;
     },
     onExplodeToggle(handler) {
       toggleButton.addEventListener("click", handler);

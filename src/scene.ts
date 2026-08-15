@@ -17,7 +17,9 @@ export function createScene(container: HTMLElement): SceneHandles {
   // contrast entirely. A slight fog toward the same gray keeps distant edges
   // soft rather than adding false depth-cueing darkness.
   scene.background = new THREE.Color(COLORS.background);
-  scene.fog = new THREE.Fog(COLORS.background, 16, 30);
+  // Far bound pushed out for the queue overview shot, which sits ~25 units
+  // out along the shared view direction (see config.ts QUEUE.overviewDistance).
+  scene.fog = new THREE.Fog(COLORS.background, 16, 42);
 
   const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, CAMERA.far);
   camera.position.set(...CAMERA.assembled.position);
@@ -38,8 +40,14 @@ export function createScene(container: HTMLElement): SceneHandles {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.target.set(...CAMERA.assembled.target);
-  controls.minDistance = 4;
-  controls.maxDistance = 22;
+  // Bounds widened for the museum queue: single-part focus shots sit close
+  // (main.ts computeFocusFor clamps its live bounding-box distance to this
+  // very range) and the overview sits far (~25 units, QUEUE.overviewDistance)
+  // — flyCamera drives the camera directly, but OrbitControls.update() still
+  // clamps to these every frame regardless of controls.enabled, so both
+  // scripted extremes must fit inside them.
+  controls.minDistance = 2;
+  controls.maxDistance = 34;
   controls.maxPolarAngle = Math.PI * 0.85;
 
   // Product-photography rig: one large soft key light from front-top, a

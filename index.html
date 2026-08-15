@@ -25,6 +25,7 @@
       </header>
 
       <div class="hover-label" id="hover-label" aria-hidden="true"></div>
+      <div class="queue-labels" id="queue-labels" aria-hidden="true"></div>
 
       <nav class="kbd-parts" id="kbd-parts" aria-label="Select a part by name (keyboard accessible)"></nav>
 
@@ -39,8 +40,13 @@
         inert
         tabindex="-1"
       >
-        <button type="button" class="panel-close" id="panel-close" aria-label="Close details, return to exploded view">
-          ✕
+        <button
+          type="button"
+          class="panel-close"
+          id="panel-close"
+          aria-label="Back to overview, camera pulls back to show the full parts queue"
+        >
+          Back to Overview
         </button>
         <p class="panel-index" id="panel-index"></p>
         <h2 id="panel-name"></h2>
