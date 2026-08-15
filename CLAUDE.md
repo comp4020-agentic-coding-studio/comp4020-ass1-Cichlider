@@ -192,3 +192,35 @@ rules came from bugs the checks couldn't catch, only manual verification could:
   both are small, but a large flat part (the motherboard) can still occlude a
   smaller neighbour in the two slots adjacent to it. Put the smallest parts in
   the slots next to the largest one, not just anywhere in the fan.
+- **THREE.js composes an object's world transform as rotate-then-translate**:
+  `v_world = position + R(rotation) * v_local`. Rotation happens in local
+  space *before* the position offset is applied. So giving a mesh a fixed
+  `.position` and varying only `.rotation` never makes it orbit a different
+  pivot --- it just spins the shape in place around its own fixed position.
+  To arrange several meshes radially around a hub (fan blades, etc.), compute
+  each one's `.position` directly with trig (`center + cos(theta)*r,
+  center + sin(theta)*r`) and use `.rotation` only for that mesh's own
+  orientation, never for orbital placement.
+- **Symmetric procedural geometry can accidentally read as a face.** A flat
+  disc (fan) plus two symmetric cylinders (heat pipes) poking toward the
+  camera above a rectangular block reads as eyes+whiskers on a torso,
+  especially from a frontal focus-camera angle --- pure pareidolia, not a
+  functional bug, but worth checking any part that pairs symmetric
+  protrusions with a circular face by actually looking at the rendered
+  screenshot from the angle the focus camera uses.
+- **`aria-hidden="true"` on a container is invalid if it still has focusable
+  descendants reachable via Tab** (e.g. a slid-off-screen panel with its
+  close/nav buttons still in the tab order). Pair `aria-hidden` with the
+  `inert` DOM property/attribute, toggled together, so hidden interactive
+  elements actually drop out of the tab order --- and set the static `inert`
+  attribute in the initial HTML too, for correctness before JS runs.
+- **`clip: rect(...)` is deprecated** (stylelint's `property-no-deprecated`
+  flags it) --- use `clip-path: inset(50%)` (collapsed) / `clip-path: none`
+  (revealed) for the classic sr-only-but-focusable pattern instead.
+- **A mouse `.click()` on a visually sr-only-collapsed button will time out**,
+  even though it has a real (1px) layout box and higher z-index than what's
+  behind it --- nothing is actually painted there, so it's not hit-testable
+  (confirm with `document.elementFromPoint(x, y)` rather than reasoning about
+  z-index/stacking). Test these with the real keyboard path instead:
+  `element.focus()` then `page.keyboard.press("Enter")`, which triggers the
+  `:focus-visible` reveal and the native click-on-Enter behaviour.
