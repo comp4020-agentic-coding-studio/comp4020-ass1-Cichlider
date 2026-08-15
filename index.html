@@ -1,34 +1,68 @@
 <!doctype html>
-<html lang="en-AU">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Seven simple objects</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>桌面电脑爆炸视图 — 交互式部件解析</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header>
-      <nav aria-label="Primary">
-        <a href="./">Home</a>
-      </nav>
-    </header>
-    <main>
-      <h1>It's just seven simple objects</h1>
-      <p class="intro">
-        A computer looks like one sealed, mysterious box. Pull it apart and it's really
-        only seven physical objects, each doing one job none of the others can do. Click
-        <strong>Explode</strong>, then click a part to find out what it is.
-      </p>
-      <div class="viewer">
-        <div id="scene" data-testid="scene" role="img" aria-label="3D exploded view of a desktop computer"></div>
+    <h1 class="sr-only">桌面电脑爆炸视图 — 交互式部件解析</h1>
+
+    <div id="app">
+      <div id="scene" data-testid="scene" role="img" aria-label="桌面电脑的三维爆炸视图，可拖拽旋转"></div>
+
+      <header class="hud">
+        <p class="hud-tag">桌面电脑 · 拆解</p>
         <button type="button" id="explode-toggle" data-testid="explode-trigger" aria-pressed="false">
-          Explode
+          探索内部
         </button>
-        <aside data-testid="part-info" aria-live="polite">
-          <p class="placeholder">Click a part to learn what it does.</p>
-        </aside>
-      </div>
-    </main>
+      </header>
+
+      <div class="hover-label" id="hover-label" aria-hidden="true"></div>
+
+      <nav class="kbd-parts" id="kbd-parts" aria-label="按部件名称选择（键盘可用）"></nav>
+
+      <aside
+        class="detail-panel"
+        id="detail-panel"
+        data-testid="part-info"
+        role="dialog"
+        aria-modal="false"
+        aria-label="部件详情"
+        aria-hidden="true"
+        inert
+        tabindex="-1"
+      >
+        <button type="button" class="panel-close" id="panel-close" aria-label="关闭详情，返回爆炸视图">✕</button>
+        <p class="panel-index" id="panel-index"></p>
+        <h2 id="panel-name"></h2>
+        <p class="panel-abbr" id="panel-abbr"></p>
+        <p class="panel-def" id="panel-def"></p>
+        <p class="panel-explain" id="panel-explain"></p>
+        <dl class="panel-facts">
+          <div>
+            <dt>负责什么</dt>
+            <dd id="panel-responsibility"></dd>
+          </div>
+          <div>
+            <dt>为什么重要</dt>
+            <dd id="panel-importance"></dd>
+          </div>
+          <div>
+            <dt>规格举例</dt>
+            <dd id="panel-spec"></dd>
+          </div>
+        </dl>
+        <div class="panel-nav">
+          <button type="button" id="panel-prev">上一个</button>
+          <button type="button" id="panel-next">下一个</button>
+        </div>
+      </aside>
+
+      <p class="empty-state" id="empty-state">点击「探索内部」，或点击任意部件查看详情。</p>
+    </div>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
